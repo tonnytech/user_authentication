@@ -1,19 +1,15 @@
-const User = require('../models/userModel')
-const AppError = require('../utils/appError')
+const User = require('../models/userModel');
+const AppError = require('../utils/appError');
+const catchAsync = require('../utils/catchAsync');
 
-exports.signup = async(req, res) => {
-let newUser = await User.create({
-    name: req.body.name,
-})
+exports.signup = catchAsync(async (req, res) => {
+    const {name, email, password, passwordConfirm} = req.body
+  let newUser = await User.create({ name, email, password, passwordConfirm });
 
-if (newUser) {
-res.status(200).json({
-    status: 'success',
-    newUser,
-})
-} else {
- res.status(404).json({
-    status: 'fail'
- })
-}
-}
+  if (newUser) {
+    res.status(200).json({
+      status: 'success',
+      newUser,
+    });
+  }
+});
