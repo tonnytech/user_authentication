@@ -120,3 +120,18 @@ exports.verifyEmail = catchAsync(async (req, res) => {
 
   createSendToken(newUser, 201, res);
 });
+
+exports.login = catchAsync(async(req, res,next)=>{
+  const {email, password} = req.body;
+
+  if(!email || !password){
+    return next (new AppError('Please provide email and password', 400))
+  }
+
+  const user = await User.find({email}).select('+password');
+
+  if(!user || !(await user.correctPassword(password, user.password))){
+    return next(new AppError('username or password is incorrect', 401))
+  }
+  createSendToken(user, 200, res)
+})
