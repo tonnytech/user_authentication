@@ -6,6 +6,9 @@ const userRouter = require('./routes/userRoutes');
 const app = express();
 app.use(express.json());
 
+app.set('view engine', 'pug');
+app.set('views', path.join(__dirname, 'views'));
+
 console.log(process.env.NODE_ENV);
 
 app.use('/api/v1/users', userRouter);
