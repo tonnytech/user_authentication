@@ -2,6 +2,7 @@ const express = require('express');
 const AppError = require('./utils/appError');
 const globalErrorHandling = require('./controllers/errorController');
 const userRouter = require('./routes/userRoutes');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
