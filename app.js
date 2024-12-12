@@ -3,9 +3,22 @@ const AppError = require('./utils/appError');
 const globalErrorHandling = require('./controllers/errorController');
 const userRouter = require('./routes/userRoutes');
 const path = require('path');
+const cors = require('cors');
 
 const app = express();
 app.use(express.json());
+
+const allowCorsAccess = (app) => {
+  const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  };
+
+  app.use(cors(corsOptions));
+};
+
+allowCorsAccess(app);
 
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));

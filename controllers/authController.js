@@ -71,7 +71,7 @@ const signToken = (id) => {
 
 //================create send token ======================
 
-const createSendToken = (user, statusCode, res) => {
+const createSendToken = (user, statusCode, res, type) => {
   const token = signToken(user._id);
 
   const cookieOptions = {
@@ -79,19 +79,24 @@ const createSendToken = (user, statusCode, res) => {
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
+    secure: true,
   };
 
-  if (process.env.NODE_ENV.startsWith('prod')) cookieOptions.secure = true;
+  // if (process.env.NODE_ENV.startsWith('prod')) cookieOptions.secure = true;
 
   res.cookie('jwt', token, cookieOptions);
 
-  res.status(statusCode).json({
-    status: 'Success',
-    token,
-    data: {
-      user,
-    },
-  });
+  if (type === 'signup') {
+    res.redirect('http://localhost:3000/?success=true');
+  } else {
+    res.status(statusCode).json({
+      status: 'Success',
+      token,
+      data: {
+        user,
+      },
+    });
+  }
 };
 
 //==================User signup=============================
@@ -118,20 +123,110 @@ exports.verifyEmail = catchAsync(async (req, res) => {
   newUser.password = undefined;
   newUser.active = undefined;
 
-  createSendToken(newUser, 201, res);
+  createSendToken(newUser, 201, res, 'signup');
 });
 
-exports.login = catchAsync(async(req, res,next)=>{
-  const {email, password} = req.body;
+//===================user login======================
 
-  if(!email || !password){
-    return next (new AppError('Please provide email and password', 400))
+exports.login = catchAsync(async (req, res, next) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return next(new AppError('Please provide email and password', 400));
   }
 
-  const user = await User.find({email}).select('+password');
+  const user = await User.find({ email }).select('+password');
 
-  if(!user || !(await user.correctPassword(password, user.password))){
-    return next(new AppError('username or password is incorrect', 401))
+  if (!user || !(await user.correctPassword(password, user.password))) {
+    return next(new AppError('username or password is incorrect', 401));
   }
-  createSendToken(user, 200, res)
-})
+  createSendToken(user, 200, res, 'login');
+});
+
+//==================logout=========================
+
+exports.logout = (req, res, next) => {
+  res.cookie('jwt', 'loggedout', {
+    expires: new Date(Date.now() + 10 * 1000),
+    httpOnly: true,
+  });
+  res.status(200).json({ status: 'success' });
+};
+
+//===================================================
+
+exports.forgotPassword = catchAsync(async (req, res, next) => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return next(new AppError('User with this email does not exist', 404));
+  }
+
+  const resetToken = user.createPasswordResetToken();
+  await user.save({ validateBeforeSave: false });
+
+  try {
+    const resetURL = `${req.protocol}://${req.get(
+      'host'
+    )}/api/v1/users/resetPassword/${resetToken}`;
+
+    await new Email(user, resetURL).sendPasswordReset();
+    res.status(200).json({
+      status: 'success',
+      message: 'Token sent to email',
+    });
+  } catch (error) {
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    return next(
+      new AppError('There was an error sending the email. Try again later')
+    );
+  }
+});
+
+//=================================================================================
+
+exports.protect = catchAsync(async (req, res, next) => {
+  let token;
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies.jwt) {
+    token = req.cookies.jwt;
+  }
+
+  if (!token) {
+    return next(new AppError('You are not logged in! Please log in', 401));
+  }
+  const decode = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  // console.log(decode);
+
+  // decode.id = '66f3b1d4b16da06b8a9772b8';
+
+  const freshUser = await User.findById(decode.id);
+
+  if (!freshUser) {
+    return next(
+      new AppError(
+        'The user who had been asigned this token nolonger exists!',
+        401
+      )
+    );
+  }
+
+  if (freshUser.changedPasswordAfter(decode.iat)) {
+    return next(
+      new AppError('User recently changed password. Please login again', 401)
+    );
+  }
+
+  req.user = freshUser;
+
+  next();
+});
