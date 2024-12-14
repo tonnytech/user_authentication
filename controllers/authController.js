@@ -3,8 +3,9 @@ const AppError = require('../utils/appError');
 const catchAsync = require('../utils/catchAsync');
 const Email = require('../utils/email');
 const jwt = require('jsonwebtoken');
+const { promisify } = require('util');
 
-//===============Email confirmation =========================
+//=== === === === Email confirmation === === === === ===
 
 const unverifiedUsers = {};
 
@@ -79,19 +80,19 @@ const createSendToken = (user, statusCode, res, type) => {
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
-    secure: true,
+    sameSite: 'None',
+    secure: true, // Must be true with SameSite: 'None'
   };
 
   // if (process.env.NODE_ENV.startsWith('prod')) cookieOptions.secure = true;
 
-  res.cookie('jwt', token, cookieOptions);
-
   if (type === 'signup') {
-    res.redirect('http://localhost:3000/?success=true');
+    res.cookie('jwtAuthenticateWebUserData', token, cookieOptions);
+    res.redirect(`${process.env.FRONTEND_URL}/?success=true`);
   } else {
+    res.cookie('jwtAuthenticateWebUserData', token, cookieOptions);
     res.status(statusCode).json({
       status: 'Success',
-      token,
       data: {
         user,
       },
@@ -135,7 +136,7 @@ exports.login = catchAsync(async (req, res, next) => {
     return next(new AppError('Please provide email and password', 400));
   }
 
-  const user = await User.find({ email }).select('+password');
+  const user = await User.findOne({ email }).select('+password');
 
   if (!user || !(await user.correctPassword(password, user.password))) {
     return next(new AppError('username or password is incorrect', 401));
@@ -146,9 +147,11 @@ exports.login = catchAsync(async (req, res, next) => {
 //==================logout=========================
 
 exports.logout = (req, res, next) => {
-  res.cookie('jwt', 'loggedout', {
+  res.cookie('jwtAuthenticateWebUserData', 'loggedout', {
     expires: new Date(Date.now() + 10 * 1000),
     httpOnly: true,
+    sameSite: 'None',
+    secure: true,
   });
   res.status(200).json({ status: 'success' });
 };
@@ -197,17 +200,16 @@ exports.protect = catchAsync(async (req, res, next) => {
     req.headers.authorization.startsWith('Bearer')
   ) {
     token = req.headers.authorization.split(' ')[1];
-  } else if (req.cookies.jwt) {
-    token = req.cookies.jwt;
+  } else if (req.cookies.jwtAuthenticateWebUserData) {
+    req.cookies && req.cookies.jwtAuthenticateWebUserData
+      ? (token = req.cookies.jwtAuthenticateWebUserData)
+      : (token = req.userCookie);
   }
 
   if (!token) {
     return next(new AppError('You are not logged in! Please log in', 401));
   }
   const decode = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
-  // console.log(decode);
-
-  // decode.id = '66f3b1d4b16da06b8a9772b8';
 
   const freshUser = await User.findById(decode.id);
 

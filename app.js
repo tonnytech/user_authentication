@@ -4,21 +4,36 @@ const globalErrorHandling = require('./controllers/errorController');
 const userRouter = require('./routes/userRoutes');
 const path = require('path');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 
 const app = express();
+app.use(cookieParser());
 app.use(express.json());
 
-const allowCorsAccess = (app) => {
-  const corsOptions = {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  };
+// const allowCorsAccess = (app) => {
+//   const corsOptions = {
+//     origin: '*',
+//     methods: ['GET', 'POST', 'PUT', 'DELETE'],
+//     allowedHeaders: ['Content-Type', 'Authorization'],
+//   };
 
-  app.use(cors(corsOptions));
-};
+//   app.use(cors(corsOptions));
+// };
 
-allowCorsAccess(app);
+// allowCorsAccess(app);
+
+app.use(
+  cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  })
+);
+
+// app.use((req, res, next) => {
+//   console.log('cookie from the app.js', req.cookies.jwt);
+//   req.userCookie = req.cookies.jwt;
+//   next();
+// });
 
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
