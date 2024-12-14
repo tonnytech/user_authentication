@@ -24,7 +24,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   })
 );
@@ -38,8 +38,11 @@ app.use(
 app.set('view engine', 'pug');
 app.set('views', path.join(__dirname, 'views'));
 
-console.log(process.env.NODE_ENV);
-
+app.get('/', (req, res)=>{
+  res.status(200).json({
+    message: 'Server is active'
+  })
+})
 app.use('/api/v1/users', userRouter);
 
 app.all('*', (req, res, next) => {
